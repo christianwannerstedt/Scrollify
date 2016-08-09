@@ -77,6 +77,7 @@
 		top = $window.scrollTop(),
 		scrollable = false,
 		locked = false,
+		lockThreshold = 0,
 		scrolled = false,
 		manualScroll,
 		swipeScroll,
@@ -93,7 +94,9 @@
 			sectionName: "section-name",
 			interstitialSection: "",
 			easing: "easeOutExpo",
-			scrollSpeed: 1100,
+			//easing: "easeOut",
+			//scrollSpeed: 1100,
+			scrollSpeed: 1000,
 			offset : 0,
 			scrollbars: true,
 			axis:"y",
@@ -141,13 +144,14 @@
 				}
 			} else {
 				locked = true;
+				lockThreshold = 0;
 				if( $().velocity ) {
 					$(settings.target).stop().velocity('scroll', {
-	          duration: settings.scrollSpeed,
-	          easing: settings.easing,
-	          offset: heights[index],
-	          mobileHA: false
-          });
+						duration: settings.scrollSpeed,
+						easing: settings.easing,
+						offset: heights[index],
+						mobileHA: false
+					});
 				} else {
 					$(settings.target).stop().animate({
 						scrollTop: heights[index]
@@ -270,6 +274,9 @@
 				}
 				if(!overflow[index]) {
 					e.preventDefault();
+				} else {
+					// Stop the animation to prevent flickering
+					$(settings.target).stop();
 				}
 				var currentScrollTime = new Date().getTime();
 
@@ -298,6 +305,11 @@
 
 				if(locked) {
 					return false;
+					/*if (lockThreshold++ < 25) {
+						return false;
+					} else {
+						lockThreshold = 0;
+					}*/
 				}
 
 				if(delta<0) {
@@ -317,6 +329,7 @@
 								}
 
 								locked = true;
+								lockThreshold = 0;
 								animateScroll(index,false,true);
 							} else {
 								return false;
@@ -329,7 +342,22 @@
 							if(isAccelerating(scrollSamples)) {
 								e.preventDefault();
 								index--;
+
+
+								if (settings.centerSections) {
+									// If there are many small sections on bottom of the page when the centerSections option
+									// is active, no scrolling will occur when jumping between them since they can't be centered.
+									// So go to the first section that will change the scroll instead.
+									var docHeight = $(document).height();
+									var winHeight = $window.height();
+									var scrollHeight = docHeight - winHeight;
+									while (index > 0 && heights[index] > scrollHeight) {
+										index--;
+									}
+								}
+
 								locked = true;
+								lockThreshold = 0;
 								animateScroll(index,false,true);
 							} else {
 								return false
@@ -343,13 +371,26 @@
 				if(disabled===true) {
 					return true;
 				}
-				if(locked===true) {
+				/*if(locked===true) {
 					return false;
-				}
+				}*/
 				if(e.keyCode==38) {
 					if(index>0) {
 						if(atTop()) {
 							index--;
+
+							if (settings.centerSections) {
+								// If there are many small sections on bottom of the page when the centerSections option
+								// is active, no scrolling will occur when jumping between them since they can't be centered.
+								// So go to the first section that will change the scroll instead.
+								var docHeight = $(document).height();
+								var winHeight = $window.height();
+								var scrollHeight = docHeight - winHeight;
+								while (index > 0 && heights[index] > scrollHeight) {
+									index--;
+								}
+							}
+
 							animateScroll(index,false,true);
 						}
 					}
@@ -357,6 +398,16 @@
 					if(index<heights.length-1) {
 						if(atBottom()) {
 							index++;
+
+							if (settings.centerSections) {
+								// If there are many small sections on top of the page when the centerSections option
+								// is active, no scrolling will occur when jumping between them since they can't be centered.
+								// So go to the first section that will change the scroll instead.
+								while (heights[index] < 0 || index < heights.length - 1 && heights[index] === heights[index + 1]) {
+									index++;
+								}
+							}
+
 							animateScroll(index,false,true);
 						}
 					}
@@ -621,6 +672,7 @@
 			$(selector).each(function(i){
 					if(i>0) {
 						if(settings.centerSections) {
+							//var docHeight = $(document).height();
 							var elHeight = $(this).innerHeight();
 							if(elHeight < winHeight) {
 								heights[i] = parseInt($(this).offset().top - (winHeight - elHeight) / 2) + settings.offset;
@@ -640,9 +692,11 @@
 							names[i] = "#" + (i + 1);
 						} else {
 							names[i] = "#";
+							/*
 							if(i===$(selector).length-1 && i>1) {
 								heights[i] = heights[i-1]+parseInt($(this).height());
 							}
+							*/
 						}
 					}
 					elements[i] = $(this);
